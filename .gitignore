@@ -1,0 +1,5 @@
+# Rapporter innehåller riktig konfig – ska aldrig committas
+reports/
+*.cfg
+*.xlsx
+.env

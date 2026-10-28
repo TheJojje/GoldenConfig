@@ -1,0 +1,5 @@
+name;host;group;template
+SW-DIST-01;10.70.0.2;distribution;distribution-switch
+SW-DC-01;10.70.0.5;dc;dc-switch
+SW-ACC-01;10.70.0.10;access;access-switch
+SW-ACC-02;10.70.0.20;access;access-switch

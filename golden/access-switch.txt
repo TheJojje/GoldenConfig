@@ -1,0 +1,182 @@
+# Exempel på golden config för en access-switch, skrivet i vanlig IOS-syntax.
+# Döp mappen till "golden" (eller kör med -GoldenDir) och filnamnet blir templatets namn: "access-switch".
+# Alla värden här är påhittade (dokumentationsadresser, platshållare) – anpassa till er miljö.
+#
+# port_check: off
+# extra: on
+# extra_ignore: ^vlan \d+$
+# extra_ignore: ^interface Vlan\d+$
+
+service nagle
+service tcp-keepalives-in
+service tcp-keepalives-out
+service timestamps debug uptime
+service timestamps log datetime msec localtime show-timezone
+service password-encryption
+
+logging console critical
+logging monitor critical
+aaa new-model
+aaa local authentication default authorization default
+
+aaa group server tacacs+ TACACS-GRP
+ server name TACACS01
+ server name TACACS02
+
+aaa authentication login VTY group TACACS-GRP local
+aaa authentication enable default group TACACS-GRP enable
+aaa authorization console
+aaa authorization config-commands
+aaa authorization exec CON none
+aaa authorization exec VTY group TACACS-GRP local if-authenticated
+aaa authorization commands 1 VTY group TACACS-GRP local if-authenticated
+aaa authorization commands 15 VTY group TACACS-GRP local if-authenticated
+aaa accounting exec default start-stop group TACACS-GRP
+aaa accounting commands 1 default start-stop group TACACS-GRP
+aaa accounting commands 15 default start-stop group TACACS-GRP
+
+aaa session-id common
+clock timezone MET 1 0
+clock summer-time MET-DST recurring last Sun Mar 2:00 last Sun Oct 3:00
+
+no ip domain lookup
+ip domain name example.local
+
+login on-success log
+udld aggressive
+
+vtp domain EXAMPLE
+vtp mode transparent
+
+archive
+ log config
+  logging enable
+  notify syslog contenttype plaintext
+ path ftp://192.0.2.13/SWITCH/<ANY>/<ANY>_
+ write-memory
+
+spanning-tree mode rapid-pvst
+spanning-tree portfast default
+spanning-tree portfast bpduguard default
+spanning-tree extend system-id
+spanning-tree uplinkfast
+spanning-tree vlan 1-4094 priority 61440
+
+errdisable recovery cause udld
+errdisable recovery cause link-flap
+errdisable recovery interval 60
+
+mka policy MSEC-POLICY
+ key-server priority 20
+ macsec-cipher-suite gcm-aes-256
+ sak-rekey interval 30
+
+# Hemligheter (enable secret, lokala användare, FTP-/TACACS-nycklar, SNMP-community) ska inte ligga i golden.
+# Lägg dem som valfria rader (? framför) om ni vill att de inte flaggas som extra.
+? enable secret <ANY>
+? username <ANY> privilege 15 password <ANY>
+
+redundancy
+ mode sso
+
+transceiver type all
+ monitoring
+
+interface Port-channel1
+ description <ANY>
+ switchport trunk native vlan 2720
+ switchport mode trunk
+ switchport nonegotiate
+
+interface Vlan1
+ description *** DEFAULT VLAN Do Not Use! ***
+ no ip address
+ no ip route-cache
+ shutdown
+
+interface Vlan2720
+ ip address <ANY> 255.255.255.0
+ no ip route-cache
+
+ip default-gateway 10.70.0.1
+ip forward-protocol nd
+ip forward-protocol udp
+no ip http server
+ip http authentication local
+ip http secure-server
+ip ssh bulk-mode 131072
+
+ip access-list standard ALLOW-NTP
+ 10 permit 10.70.0.1
+ 20 permit 192.0.2.14
+ 30 permit 192.0.2.20
+ 40 deny any log
+ip access-list standard ALLOW-SSH
+ 10 permit 198.51.100.155
+ 20 permit 192.0.2.13
+ 30 permit 192.0.2.14
+ 40 permit 192.0.2.20
+ 50 permit 198.51.100.0 0.0.0.255
+ 60 deny any log
+!
+ip access-list extended ALLOW-SNMP-RO
+ 10 permit udp host 192.0.2.14 10.70.0.0 0.0.0.255 eq snmp
+ 20 permit udp host 192.0.2.20 10.70.0.0 0.0.0.255 eq snmp
+ 30 permit udp host 192.0.2.14 10.70.0.0 0.0.0.255 eq snmptrap
+ 40 permit udp host 192.0.2.20 10.70.0.0 0.0.0.255 eq snmptrap
+ 50 deny ip any any log
+
+tacacs server TACACS01
+ address ipv4 203.0.113.29
+tacacs server TACACS02
+ address ipv4 203.0.113.19
+
+banner motd CC
+
+
+*********************************************************************
+*           This equipment is for authorized use only.              *
+*     If you are not authorized, DISCONNECT IMMEDIATELY.            *
+*                   All attempts are logged!                        *
+*********************************************************************
+
+
+line con 0
+ exec-timeout 0 0
+ authorization exec CON
+ logging synchronous
+ stopbits 1
+
+line vty 0 4
+ session-timeout 60 output
+ access-class ALLOW-SSH in
+ exec-timeout 0 0
+ authorization commands 1 VTY
+ authorization commands 15 VTY
+ authorization exec VTY
+ login authentication VTY
+ length 0
+ transport input ssh
+
+line vty 5 15
+ session-timeout 60 output
+ access-class ALLOW-SSH in
+ authorization commands 1 VTY
+ authorization commands 15 VTY
+ authorization exec VTY
+ login authentication VTY
+ length 0
+ transport input ssh
+
+line vty 16 31
+ session-timeout 60 output
+ access-class ALLOW-SSH in
+ authorization commands 1 VTY
+ authorization commands 15 VTY
+ authorization exec VTY
+ login authentication VTY
+ length 0
+ transport input ssh
+
+ntp access-group peer ALLOW-NTP
+ntp server 10.70.0.1
